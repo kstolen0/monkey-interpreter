@@ -35,7 +35,7 @@ func TestLetStatements(t *testing.T) {
 
 	for i, tt := range tests {
 		stmt := program.Statements[i]
-		if !testLeStatement(t, stmt, tt.expectedIdentifier) {
+		if !testLetStatement(t, stmt, tt.expectedIdentifier) {
 			return
 		}
 	}
@@ -56,7 +56,7 @@ func checkParserErrors(t *testing.T, p *Parser) {
 	t.FailNow()
 }
 
-func testLeStatement(t *testing.T, s ast.Statement, name string) bool {
+func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
 	if s.TokenLiteral() != "let" {
 		t.Errorf("s.TokenLiteral hnot 'let'. got %q", s.TokenLiteral())
 		return false
