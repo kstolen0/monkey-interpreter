@@ -155,7 +155,7 @@ func TestBooleanExpression(t *testing.T) {
 		p := New(l)
 		program := p.ParseProgram()
 
-		if !testProgramStatements(t, program, 1) {
+		if !testNumberOfStatements(t, program.Statements, 1) {
 			return
 		}
 		stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
@@ -170,9 +170,9 @@ func TestBooleanExpression(t *testing.T) {
 	}
 }
 
-func testProgramStatements(t *testing.T, program *ast.Program, expected int) bool {
-	if len(program.Statements) != expected {
-		t.Fatalf("program has not enough statements. Expected %d. Got %d", expected, len(program.Statements))
+func testNumberOfStatements(t *testing.T, statements []ast.Statement, expected int) bool {
+	if len(statements) != expected {
+		t.Fatalf("program has not enough statements. Expected %d. Got %d", expected, len(statements))
 		return false
 	}
 
@@ -500,4 +500,85 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 			t.Errorf("expected %q. Got %q", tt.expected, actual)
 		}
 	}
+}
+
+func TestIdExpression(t *testing.T) {
+	input := `if (x < y) { x }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	testNumberOfStatements(t, program.Statements, 1)
+
+	stmt := getExpressionStatement(t, program.Statements)
+
+	exp, ok := stmt.Expression.(*ast.IfExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.IfExpression. Got %T", stmt.Expression)
+	}
+
+	if !testInfixExpression(t, exp.Condition, "x", "<", "y") {
+		return
+	}
+
+	testNumberOfStatements(t, exp.Consequence.Statements, 1)
+
+	consequence := getExpressionStatement(t, exp.Consequence.Statements)
+
+	if !testIdentifier(t, consequence.Expression, "x") {
+		return
+	}
+
+	if exp.Alternative != nil {
+		t.Errorf("exp.Alternative.Statements was not nil. Got %+v", exp.Alternative)
+	}
+}
+
+func TestIfElseExpression(t *testing.T) {
+	input := `if (x < y) { x } else { y }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	testNumberOfStatements(t, program.Statements, 1)
+
+	stmt := getExpressionStatement(t, program.Statements)
+
+	exp, ok := stmt.Expression.(*ast.IfExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.IfExpression. Got %T", stmt.Expression)
+	}
+
+	if !testInfixExpression(t, exp.Condition, "x", "<", "y") {
+		return
+	}
+
+	testNumberOfStatements(t, exp.Consequence.Statements, 1)
+
+	consequence := getExpressionStatement(t, exp.Consequence.Statements)
+
+	if !testIdentifier(t, consequence.Expression, "x") {
+		return
+	}
+
+	testNumberOfStatements(t, exp.Alternative.Statements, 1)
+
+	alternative := getExpressionStatement(t, exp.Alternative.Statements)
+
+	if !testIdentifier(t, alternative.Expression, "y") {
+		return
+	}
+}
+
+func getExpressionStatement(t *testing.T, statements []ast.Statement) *ast.ExpressionStatement {
+	stmt, ok := statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("statements[0] is not an ast.ExpressionStatement. Got %T", statements[0])
+	}
+
+	return stmt
 }
