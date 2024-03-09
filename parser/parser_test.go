@@ -8,35 +8,31 @@ import (
 )
 
 func TestLetStatements(t *testing.T) {
-	input := `
-	let x = 5;
-	let y = 10;
-	let foobar = 81818181;`
-
-	l := lexer.New(input)
-	p := New(l)
-
-	program := p.ParseProgram()
-	checkParserErrors(t, p)
-
-	if program == nil {
-		t.Fatalf("ParseProgram returned nil")
-	}
-	if len(program.Statements) != 3 {
-		t.Fatalf("program.Statements does not contain 3 statements. Got %d", len(program.Statements))
-	}
-
 	tests := []struct {
+		input              string
 		expectedIdentifier string
+		expectedValue      interface{}
 	}{
-		{"x"},
-		{"y"},
-		{"foobar"},
+		{"let x = 5;", "x", 5},
+		{"let y = true;", "y", true},
+		{"let foobar = y;", "foobar", "y"},
 	}
 
-	for i, tt := range tests {
-		stmt := program.Statements[i]
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
+
+		testNumberOfStatements(t, program.Statements, 1)
+
+		stmt := program.Statements[0]
 		if !testLetStatement(t, stmt, tt.expectedIdentifier) {
+			return
+		}
+
+		val := stmt.(*ast.LetStatement).Value
+		if !testLiteralExpression(t, val, tt.expectedValue) {
 			return
 		}
 	}
@@ -83,32 +79,35 @@ func testLetStatement(t *testing.T, s ast.Statement, name string) bool {
 }
 
 func TestReturnStatements(t *testing.T) {
-	input := `
-	return 5;
-	return 10;
-	return 123456;
-	`
 
-	l := lexer.New(input)
-	p := New(l)
-
-	program := p.ParseProgram()
-	checkParserErrors(t, p)
-
-	if len(program.Statements) != 3 {
-		t.Fatalf("program.Statements does not contain 3 statements. Got %d", len(program.Statements))
+	tests := []struct {
+		input         string
+		expectedValue interface{}
+	}{
+		{"return 5;", 5},
+		{"return 12345;", 12345},
+		{"return x;", "x"},
+		{"return fn(){};", "fn(){}"},
 	}
 
-	for _, stmt := range program.Statements {
-		returnStmt, ok := stmt.(*ast.ReturnStatement)
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserErrors(t, p)
 
+		testNumberOfStatements(t, program.Statements, 1)
+
+		returnStmt, ok := program.Statements[0].(*ast.ReturnStatement)
 		if !ok {
-			t.Errorf("stmt not *ast.ReturnStatement. Got %T", stmt)
-			continue
+			t.Errorf("stmt not *ast.ReturnStatement. Got %T", program.Statements[0])
 		}
+
 		if returnStmt.TokenLiteral() != "return" {
 			t.Errorf("returnStmt.TokenLiteral not 'return'. Got %q", returnStmt.TokenLiteral())
 		}
+
+		testLiteralExpression(t, returnStmt.ReturnValue, tt.expectedValue)
 	}
 }
 
@@ -316,6 +315,36 @@ func TestFunctionParameterParsing(t *testing.T) {
 	}
 }
 
+func TestCallExpressionParsing(t *testing.T) {
+	input := "add(1, 2 *3, 4 + 5);"
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	testNumberOfStatements(t, program.Statements, 1)
+
+	stmt := asExpressionStatement(program.Statements[0], t)
+
+	exp, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not ast.CallExpression. Got %T", stmt.Expression)
+	}
+
+	if !testIdentifier(t, exp.Function, "add") {
+		return
+	}
+
+	if len(exp.Arguments) != 3 {
+		t.Fatalf("wrong length of arguments. expexted %d. Got %d", 3, len(exp.Arguments))
+	}
+
+	testLiteralExpression(t, exp.Arguments[0], 1)
+	testInfixExpression(t, exp.Arguments[1], 2, "*", 3)
+	testInfixExpression(t, exp.Arguments[2], 4, "+", 5)
+}
+
 func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
 	integ, ok := il.(*ast.IntegerLiteral)
 	if !ok {
@@ -332,6 +361,15 @@ func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) bool {
 	}
 
 	return true
+}
+
+func asExpressionStatement(s ast.Statement, t *testing.T) *ast.ExpressionStatement {
+	stmt, ok := s.(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("stmt is not an expression statement. Got %T", s)
+	}
+
+	return stmt
 }
 
 func testIdentifier(t *testing.T, exp ast.Expression, value string) bool {
@@ -551,6 +589,18 @@ func TestOperatorPrecedenceParsing(t *testing.T) {
 		{
 			"!(true == true)",
 			"(!(true == true))",
+		},
+		{
+			"a + add(b * c) + d",
+			"((a + add((b * c))) + d)",
+		},
+		{
+			"add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+			"add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+		},
+		{
+			"add(a + b + c * d / f + g)",
+			"add((((a + b) + ((c * d) / f)) + g))",
 		},
 	}
 
