@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"monkey/evaluator"
 	"monkey/lexer"
 	"monkey/parser"
 )
@@ -15,7 +16,7 @@ const MONKEY_FACE = `
   .--.  .-"    "-. .--.
  / .. \/ .-. .-. \/ .. \
 | |  '| /   Y   \ |'  | |
-| \   \ \ 0 | 0 / /  /  |
+| \   \ \ 0 | 0 / /   / |
 \ '- ,\.-"""""""-./, -' /
  ''-' /_   ^ ^   _\ '-''
      |  \._   _./  |
@@ -45,7 +46,8 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
-		io.WriteString(out, program.String())
+		evaluated := evaluator.Eval(program)
+		io.WriteString(out, evaluated.Inspect())
 		io.WriteString(out, "\n")
 	}
 }
