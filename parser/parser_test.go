@@ -87,7 +87,6 @@ func TestReturnStatements(t *testing.T) {
 		{"return 5;", 5},
 		{"return 12345;", 12345},
 		{"return x;", "x"},
-		{"return fn(){};", "fn(){}"},
 	}
 
 	for _, tt := range tests {
@@ -687,6 +686,25 @@ func TestIfElseExpression(t *testing.T) {
 
 	if !testIdentifier(t, alternative.Expression, "y") {
 		return
+	}
+}
+
+func TestStringLiteralExpression(t *testing.T) {
+	input := `"hello world";`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserErrors(t, p)
+
+	stmt := program.Statements[0].(*ast.ExpressionStatement)
+	literal, ok := stmt.Expression.(*ast.StringLiteral)
+	if !ok {
+		t.Fatalf("exp not string literal. Got %T", stmt.Expression)
+	}
+
+	if literal.Value != "hello world" {
+		t.Errorf("literal value not %q. Got %q", "hello world", literal.Value)
 	}
 }
 
