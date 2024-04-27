@@ -293,6 +293,10 @@ func TestBuiltinFunctions(t *testing.T) {
 		{`len("hello world")`, 11},
 		{`len(1)`, "argument to `len` not supported, got INTEGER"},
 		{`len("one", "two")`, "wrong number of arguments. got=2, want=1"},
+		{`len([0, 1, 2, 3, 4])`, 5},
+		{`len([])`, 0},
+		{`first([1, 2, 3, 4])`, 1},
+		{`last([1, 2, 3, 4])`, 4},
 	}
 
 	for _, tt := range tests {
@@ -311,6 +315,57 @@ func TestBuiltinFunctions(t *testing.T) {
 			if errObj.Message != expected {
 				t.Errorf("wrong error message. expected %q. Got %q", expected, errObj.Message)
 			}
+		}
+	}
+}
+
+func TestBuiltInRestFn(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`rest([1, 2, 3, 4])`, `[2, 3, 4]`},
+		{`rest(rest([1, 2, 3, 4]))`, `[3, 4]`},
+		{`rest(rest(rest([1, 2, 3, 4])))`, `[4]`},
+		{`rest(rest(rest(rest([1, 2, 3, 4]))))`, `[]`},
+		{`let x = [1, 2, 3, 4, 5]; rest(x); x;`, `[1, 2, 3, 4, 5]`},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		result, ok := evaluated.(*object.Array)
+
+		if !ok {
+			t.Fatalf("object is not Array. got %T (%+v)", evaluated, evaluated)
+		}
+
+		if result.Inspect() != tt.expected {
+			t.Errorf("unexpected array. Expected %s. got %s", tt.expected, result.Inspect())
+			continue
+		}
+	}
+}
+
+func TestBuiltInPushFn(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{`let x = [0, 1, 2, 3]; push(x, 4)`, `[0, 1, 2, 3, 4]`},
+		{`let x = [0, 1, 2, 3]; push(x, 4); x`, `[0, 1, 2, 3]`},
+	}
+
+	for _, tt := range tests {
+		evaluated := testEval(tt.input)
+		result, ok := evaluated.(*object.Array)
+
+		if !ok {
+			t.Fatalf("object is not Array. got %T (%+v)", evaluated, evaluated)
+		}
+
+		if result.Inspect() != tt.expected {
+			t.Errorf("unexped array. Expected %s. got %s", tt.expected, result.Inspect())
+			continue
 		}
 	}
 }
